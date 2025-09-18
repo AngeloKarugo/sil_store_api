@@ -1,6 +1,7 @@
 from django.db import models
 from mptt.models import MPTTModel, TreeForeignKey
 from django.forms import ValidationError
+from django.db.models import Avg
 
 
 class Category(MPTTModel):
@@ -17,6 +18,19 @@ class Category(MPTTModel):
 
     def __str__(self):
         return self.name
+
+    def get_average_price(self):
+        """
+        Return the average price (Decimal) of all products assigned to this category
+        or any of its descendant categories. Returns None if there are no products.
+        """
+        # collect products for this category and all descendants
+        descendant_categories = self.get_descendants(include_self=True)
+        # product queryset through M2M 'products' related_name
+        from django.db.models import F
+
+        qs = Product.objects.filter(category__in=descendant_categories)
+        return qs.aggregate(avg_price=Avg('price'))['avg_price']
 
 
 class Product(models.Model):
