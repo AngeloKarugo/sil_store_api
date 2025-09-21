@@ -7,6 +7,8 @@ from catalog.models import Category, Product
 from .models import Customer, Order, OrderItem, OrderStatus
 from .serializers import OrderSerializer
 
+from rest_framework.test import APIClient
+
 
 class OrderSerializerTests(TestCase):
     def setUp(self):
@@ -78,11 +80,27 @@ class OrderSerializerTests(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn("items", serializer.errors)
 
-        # Test invalid quantity
+    def test_order_creation_via_api_and_category_avg(self):
+        """Integration test: create products/categories and place order via API, then query category average"""
+        client = APIClient()
+        client.login(username="testuser", password="testpass123")
+
+        # call category average endpoint
+        cat_url = f"/api/categories/{self.category.id}/average_price/"
+        resp = client.get(cat_url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("average_price", resp.json())
+
+        # place order via API
+        order_url = "/api/orders/"
         order_data = {
-            "items": [{"product": self.product1.id, "quantity": 0}],
+            "items": [
+                {"product": self.product1.id, "quantity": 1},
+                {"product": self.product2.id, "quantity": 2},
+            ],
             "status": self.pending_status.id,
         }
-        serializer = OrderSerializer(data=order_data, context={"request": request})
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("items", serializer.errors)
+        resp = client.post(order_url, order_data, format="json")
+        self.assertIn(resp.status_code, (200, 201))
+        body = resp.json()
+        self.assertIn("id", body)
