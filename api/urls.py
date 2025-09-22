@@ -16,8 +16,7 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path
-from django.urls import include
+from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 # local viewsets
@@ -32,4 +31,5 @@ router.register(r"orders", OrderViewSet, basename="order")
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include(router.urls)),
+    path("oidc/", include("mozilla_django_oidc.urls")),  # OIDC login/callback endpoints
 ]

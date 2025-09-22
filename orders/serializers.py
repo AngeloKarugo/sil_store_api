@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from orders.models import Customer, OrderItem, Order
+from orders.models import Customer, OrderItem, Order, OrderStatus
 from catalog.models import Product
 
 
@@ -27,7 +27,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ["id", "customer", "items", "status", "created_at"]
+        fields = ["id", "customer", "items", "created_at"]
         read_only_fields = ["created_at"]
 
     def validate_items(self, value):
@@ -44,15 +44,21 @@ class OrderSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
 
-        # resolve customer: CurrentUserDefault gives a User instance; map to Customer profile
+        # set default status (pending)
+        pending_status, _ = OrderStatus.objects.get_or_create(name="pending")
+
         user = validated_data.pop("customer", None)
+
         customer = None
+
         if user is not None:
             # find or create the Customer profile
             customer, _ = Customer.objects.get_or_create(user=user)
 
         # create order
-        order = Order.objects.create(customer=customer, **validated_data)
+        order = Order.objects.create(
+            customer=customer, status=pending_status, **validated_data
+        )
 
         # create order items with snapshot of unit_price
         for item in items_data:

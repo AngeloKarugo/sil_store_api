@@ -1,6 +1,7 @@
 from rest_framework import viewsets, permissions
 from .models import Order
 from .serializers import OrderSerializer
+from . import notifications
 
 
 class OrderViewSet(viewsets.ModelViewSet):
@@ -10,4 +11,8 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         # ensure serializer has request context and will use CurrentUserDefault
-        serializer.save()
+        order = serializer.save()
+
+        notifications.send_order_email(order)
+
+        notifications.send_order_sms(order)

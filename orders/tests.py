@@ -31,9 +31,8 @@ class OrderSerializerTests(TestCase):
             name="Test Product 2", price=Decimal("20.00")
         )
         self.product2.category.add(self.category)
-
-        # Create pending status
-        self.pending_status = OrderStatus.objects.create(name="pending")
+        # Get pending status
+        self.pending_status, _ = OrderStatus.objects.get_or_create(name="pending")
 
     def test_order_creation_with_authenticated_user(self):
         """Test creating an order through the serializer with an authenticated user"""
@@ -100,7 +99,14 @@ class OrderSerializerTests(TestCase):
             ],
             "status": self.pending_status.id,
         }
-        resp = client.post(order_url, order_data, format="json")
-        self.assertIn(resp.status_code, (200, 201))
-        body = resp.json()
-        self.assertIn("id", body)
+        from unittest.mock import patch
+
+        with patch("orders.notifications.send_order_email") as mock_email, patch(
+            "orders.notifications.send_order_sms"
+        ) as mock_sms:
+            resp = client.post(order_url, order_data, format="json")
+            self.assertIn(resp.status_code, (200, 201))
+            body = resp.json()
+            self.assertIn("id", body)
+            mock_email.assert_called()
+            mock_sms.assert_called()

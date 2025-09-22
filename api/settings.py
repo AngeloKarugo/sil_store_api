@@ -11,10 +11,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
+from decouple import config
+import requests
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -24,13 +22,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-!exx(zkd7z+n-i%t+(l^mbg4-9z#=+6ncnx#*tumd-%7*o!=ki"
+SECRET_KEY = config("APP_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
 ALLOWED_HOSTS = []
-
 
 # Application definition
 
@@ -45,7 +42,18 @@ INSTALLED_APPS = [
     "mptt",
     "catalog",
     "orders",
+    "mozilla_django_oidc",
 ]
+
+# add OIDC auth backend so mozilla-django-oidc can create/authenticate Django users
+AUTHENTICATION_BACKENDS = (
+    "mozilla_django_oidc.auth.OIDCAuthenticationBackend",
+    "django.contrib.auth.backends.ModelBackend",
+)
+
+# ensure redirect goes to the API root (include trailing slash)
+LOGIN_URL = "/oidc/authenticate/"
+LOGIN_REDIRECT_URL = "/api/"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -83,11 +91,11 @@ WSGI_APPLICATION = "api.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("DATABASE_NAME"),
-        "USER": os.getenv("DATABASE_USER"),
-        "PASSWORD": os.getenv("DATABASE_PASSWORD"),
-        "HOST": os.getenv("DATABASE_HOST"),
-        "PORT": os.getenv("DATABASE_PORT"),
+        "NAME": config("DATABASE_NAME"),
+        "USER": config("DATABASE_USER"),
+        "PASSWORD": config("DATABASE_PASSWORD"),
+        "HOST": config("DATABASE_HOST"),
+        "PORT": config("DATABASE_PORT"),
     }
 }
 
@@ -132,3 +140,34 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# AfricasTalking settings
+AFRICASTALKING_USERNAME = config("AFRICASTALKING_USERNAME")
+AFRICASTALKING_KEY = config("AFRICASTALKING_KEY")
+
+# email settings
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
+ADMIN_EMAIL = config("ADMIN_EMAIL")
+
+# OIDC config
+OIDC_RP_CLIENT_ID = config("OIDC_RP_CLIENT_ID")
+OIDC_RP_CLIENT_SECRET = config("OIDC_RP_CLIENT_SECRET")
+OIDC_OP_DISCOVERY_ENDPOINT = config("OIDC_OP_DISCOVERY_ENDPOINT")
+OIDC_OP_AUTHORIZATION_ENDPOINT = config("OIDC_OP_AUTHORIZATION_ENDPOINT")
+OIDC_OP_TOKEN_ENDPOINT = config("OIDC_OP_TOKEN_ENDPOINT")
+OIDC_OP_USER_ENDPOINT = config("OIDC_OP_USER_ENDPOINT")
+OIDC_OP_JWKS_ENDPOINT = config("OIDC_OP_JWKS_ENDPOINT")
+
+OIDC_CREATE_USER = True
+OIDC_RP_SIGN_ALGO = "RS256"
+
+# DRF: keep Session auth so browsable API + OIDC session login work
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticatedOrReadOnly",
+    ),
+}
