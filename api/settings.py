@@ -164,10 +164,11 @@ OIDC_RP_SIGN_ALGO = "RS256"
 # DRF: keep Session auth so browsable API + OIDC session login work
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
+        # Bearer token (Keycloak JWT) first, then session so browsers still work
+        "api.authentication.KeycloakJWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
     ),
-    "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.IsAuthenticatedOrReadOnly",
-    ),
+    # require authentication for all endpoints by default
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
 }
