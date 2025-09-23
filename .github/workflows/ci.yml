@@ -28,8 +28,24 @@ jobs:
             DATABASE_PASSWORD: root
             DATABASE_HOST: 127.0.0.1
             DATABASE_PORT: 5432
-            # Disable OIDC discovery in CI to avoid network calls
+            APP_KEY: app-key
+            AFRICASTALKING_USERNAME: ""
+            AFRICASTALKING_KEY: ""
+            EMAIL_HOST: ""
+            EMAIL_PORT: ""
+            EMAIL_USE_TLS: ""
+            EMAIL_HOST_USER: ""
+            EMAIL_HOST_PASSWORD: ""
+            EMAIL_USE_SSL: ""
+            DEFAULT_FROM_EMAIL: ""
+            ADMIN_EMAIL: ""
+            OIDC_RP_CLIENT_ID: ""
+            OIDC_RP_CLIENT_SECRET: ""
             OIDC_OP_DISCOVERY_ENDPOINT: ""
+            OIDC_OP_AUTHORIZATION_ENDPOINT: ""
+            OIDC_OP_TOKEN_ENDPOINT: ""
+            OIDC_OP_USER_ENDPOINT: ""
+            OIDC_OP_JWKS_ENDPOINT: ""
 
         steps:
             - name: Checkout
