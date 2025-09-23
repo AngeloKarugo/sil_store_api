@@ -72,12 +72,18 @@ else:
 PY
 
       - name: Run migrations
-        run: |
-          python manage.py migrate --noinput
+        run: python manage.py migrate --noinput
 
-      - name: Run tests
+      - name: Run tests with coverage
         run: |
-          python manage.py test
+          coverage run manage.py test --parallel
+          coverage report
+          coverage xml
+
+      - name: Upload coverage to GitHub summary
+        run: |
+          echo "## Test Coverage" >> $GITHUB_STEP_SUMMARY
+          coverage report >> $GITHUB_STEP_SUMMARY
 
   build-and-publish:
     runs-on: ubuntu-latest
