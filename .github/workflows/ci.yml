@@ -78,57 +78,30 @@ jobs:
                   echo "## Test Coverage" >> $GITHUB_STEP_SUMMARY
                   coverage report >> $GITHUB_STEP_SUMMARY
 
-    build-and-publish:
+    docker:
         runs-on: ubuntu-latest
-        needs: tests
-        if: github.ref == 'refs/heads/main'
+        needs: test
+        env:
+            DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+            DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
+
         steps:
-            - name: Checkout
-              uses: actions/checkout@v4
+            - uses: actions/checkout@v4
 
             - name: Log in to DockerHub
-              if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_PASSWORD != '' }}
+              if: ${{ env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_PASSWORD != '' }}
               uses: docker/login-action@v3
               with:
-                  username: ${{ secrets.DOCKERHUB_USERNAME }}
-                  password: ${{ secrets.DOCKERHUB_PASSWORD }}
+                  username: ${{ env.DOCKERHUB_USERNAME }}
+                  password: ${{ env.DOCKERHUB_PASSWORD }}
 
-            - name: Build and push image
-              uses: docker/build-push-action@v4
+            - name: Build and push Docker image
+              if: ${{ env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_PASSWORD != '' }}
+              uses: docker/build-push-action@v5
               with:
-                  context: .
-                  push: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_PASSWORD != '' }}
-                  tags: |
-                      ${{ secrets.DOCKERHUB_USERNAME }}/sil_store_api:latest
-                      ${{ secrets.DOCKERHUB_USERNAME }}/sil_store_api:${{ github.sha }}
+                  push: true
+                  tags: ${{ env.DOCKERHUB_USERNAME }}/myapp:latest
 
-            - name: Upload image metadata
-              if: ${{ secrets.DOCKERHUB_USERNAME == '' }}
-              run: echo "Docker credentials not provided; skipped push"
-
-    deploy:
-        runs-on: ubuntu-latest
-        needs: build-and-publish
-        if: github.ref == 'refs/heads/main'
-
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
-
-            - name: Set up kubectl
-              run: |
-                  echo "${KUBE_CONFIG_DATA}" | base64 --decode > $HOME/.kube/config
-              env:
-                  KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
-
-            - name: Set up Helm
-              uses: azure/setup-helm@v3
-              with:
-                  version: v3.14.0
-
-            - name: Helm upgrade
-              run: |
-                  helm upgrade --install sil-store ./helm/sil-store \
-                    --namespace sil-store --create-namespace \
-                    --set image.repository=${{ secrets.DOCKERHUB_USERNAME }}/sil_store_api \
-                    --set image.tag=${{ github.sha }}
+            - name: Skip Docker push (no secrets provided)
+              if: ${{ env.DOCKERHUB_USERNAME == '' }}
+              run: echo "Skipping Docker push because secrets are missing."
