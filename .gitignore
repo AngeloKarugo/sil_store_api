@@ -214,3 +214,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# coverage.py
+.coverage
+.coverage.*
+htmlcov/
