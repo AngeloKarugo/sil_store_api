@@ -1,0 +1,12 @@
+services:
+    web:
+        build: .
+        env_file:
+            - ./api/.env
+        ports:
+            - "8000:8000"
+        depends_on:
+            - db
+        volumes:
+            - .:/app:rw
+        command: python manage.py runserver 0.0.0.0:8010
