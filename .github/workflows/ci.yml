@@ -85,7 +85,7 @@ jobs:
 
             - name: Run tests with coverage
               run: |
-                  coverage run manage.py test --parallel
+                  coverage run manage.py test
                   coverage report
                   coverage xml
 
