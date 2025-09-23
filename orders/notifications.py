@@ -30,10 +30,10 @@ def send_order_email(order):
 
 
 def send_order_sms(order):
-    """Send an SMS to the customer"""
+    """Send a confirmation SMS to the customer"""
 
-    at_api_key = settings.AFRICASTALKING_USERNAME
-    at_user = settings.AFRICASTALKING_KEY
+    at_user = settings.AFRICASTALKING_USERNAME
+    at_api_key = settings.AFRICASTALKING_KEY
 
     if not at_user or not at_api_key:
         return False
