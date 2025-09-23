@@ -116,7 +116,7 @@ jobs:
               uses: docker/build-push-action@v5
               with:
                   push: true
-                  tags: ${{ env.DOCKERHUB_USERNAME }}/myapp:latest
+                  tags: ${{ env.DOCKERHUB_USERNAME }}/sil_store:latest
 
             - name: Skip Docker push (no secrets provided)
               if: ${{ env.DOCKERHUB_USERNAME == '' }}
