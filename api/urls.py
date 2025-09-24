@@ -16,12 +16,19 @@ Including another URLconf
 """
 
 from django.contrib import admin
+from django.http import JsonResponse
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 # local viewsets
+from api.views import HealthCheckView
 from catalog.views import CategoryViewSet, ProductViewSet
 from orders.views import OrderViewSet
+
+
+def health_check(request):
+    return JsonResponse({"status": "ok"})
+
 
 router = DefaultRouter()
 router.register(r"categories", CategoryViewSet, basename="category")
@@ -31,5 +38,6 @@ router.register(r"orders", OrderViewSet, basename="order")
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include(router.urls)),
-    path("oidc/", include("mozilla_django_oidc.urls")),  # OIDC login/callback endpoints
+    path("oidc/", include("mozilla_django_oidc.urls")),
+    path("health/", HealthCheckView.as_view(), name="health_check"),
 ]

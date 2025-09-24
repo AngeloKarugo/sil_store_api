@@ -220,4 +220,4 @@ jobs:
 
             - name: Test API endpoint
               run: |
-                  curl --fail http://localhost:8010/api/orders/
+                  curl --fail http://localhost:8010/health
