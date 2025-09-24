@@ -121,3 +121,103 @@ jobs:
             - name: Skip Docker push (no secrets provided)
               if: ${{ env.DOCKERHUB_USERNAME == '' }}
               run: echo "Skipping Docker push because secrets are missing."
+
+    deploy:
+        runs-on: ubuntu-latest
+        needs: tests
+        env:
+            APP_KEY: ${{ secrets.APP_KEY }}
+            DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
+            DATABASE_USER: ${{ secrets.DATABASE_USER }}
+            DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+            DATABASE_HOST: ${{ secrets.DATABASE_HOST }}
+            DATABASE_PORT: ${{ secrets.DATABASE_PORT }}
+            AFRICASTALKING_USERNAME: ${{ secrets.AFRICASTALKING_USERNAME }}
+            AFRICASTALKING_KEY: ${{ secrets.AFRICASTALKING_KEY }}
+            EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
+            EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
+            EMAIL_USE_TLS: ${{ secrets.EMAIL_USE_TLS }}
+            EMAIL_HOST_USER: ${{ secrets.EMAIL_HOST_USER }}
+            EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
+            EMAIL_USE_SSL: ${{ secrets.EMAIL_USE_SSL }}
+            DEFAULT_FROM_EMAIL: ${{ secrets.DEFAULT_FROM_EMAIL }}
+            ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+            OIDC_RP_CLIENT_ID: ${{ secrets.OIDC_RP_CLIENT_ID }}
+            OIDC_RP_CLIENT_SECRET: ${{ secrets.OIDC_RP_CLIENT_SECRET }}
+            OIDC_OP_DISCOVERY_ENDPOINT: ${{ secrets.OIDC_OP_DISCOVERY_ENDPOINT }}
+            OIDC_OP_AUTHORIZATION_ENDPOINT: ${{ secrets.OIDC_OP_AUTHORIZATION_ENDPOINT }}
+            OIDC_OP_TOKEN_ENDPOINT: ${{ secrets.OIDC_OP_TOKEN_ENDPOINT }}
+            OIDC_OP_USER_ENDPOINT: ${{ secrets.OIDC_OP_USER_ENDPOINT }}
+            OIDC_OP_JWKS_ENDPOINT: ${{ secrets.OIDC_OP_JWKS_ENDPOINT }}
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Install Kind and kubectl
+              run: |
+                  # Install kubectl
+                  curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                  chmod +x ./kubectl
+                  sudo mv ./kubectl /usr/local/bin/kubectl
+
+                  # Install Kind
+                  [ $(uname -m) = x86_64 ] && curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+                  chmod +x ./kind
+                  sudo mv ./kind /usr/local/bin/kind
+
+            - name: Create Kind cluster
+              run: kind create cluster --config kind-config.yml
+
+            - name: Build and Load Docker image
+              run: |
+                  docker build -t sil_store_api:latest .
+                  kind load docker-image sil_store_api:latest
+
+            - name: Create app secrets
+              run: |
+                  kubectl create secret generic app-secrets \
+                    --from-literal=APP_KEY="${{ env.APP_KEY }}" \
+                    --from-literal=DATABASE_NAME="${{ env.DATABASE_NAME }}" \
+                    --from-literal=DATABASE_USER="${{ env.DATABASE_USER }}" \
+                    --from-literal=DATABASE_PASSWORD="${{ env.DATABASE_PASSWORD }}" \
+                    --from-literal=DATABASE_HOST="${{ env.DATABASE_HOST }}" \
+                    --from-literal=DATABASE_PORT="${{ env.DATABASE_PORT }}" \
+                    --from-literal=AFRICASTALKING_USERNAME="${{ env.AFRICASTALKING_USERNAME }}" \
+                    --from-literal=AFRICASTALKING_KEY="${{ env.AFRICASTALKING_KEY }}" \
+                    --from-literal=EMAIL_HOST="${{ env.EMAIL_HOST }}" \
+                    --from-literal=EMAIL_PORT="${{ env.EMAIL_PORT }}" \
+                    --from-literal=EMAIL_USE_TLS="${{ env.EMAIL_USE_TLS }}" \
+                    --from-literal=EMAIL_HOST_USER="${{ env.EMAIL_HOST_USER }}" \
+                    --from-literal=EMAIL_HOST_PASSWORD="${{ env.EMAIL_HOST_PASSWORD }}" \
+                    --from-literal=EMAIL_USE_SSL="${{ env.EMAIL_USE_SSL }}" \
+                    --from-literal=DEFAULT_FROM_EMAIL="${{ env.DEFAULT_FROM_EMAIL }}" \
+                    --from-literal=ADMIN_EMAIL="${{ env.ADMIN_EMAIL }}" \
+                    --from-literal=OIDC_RP_CLIENT_ID="${{ env.OIDC_RP_CLIENT_ID }}" \
+                    --from-literal=OIDC_RP_CLIENT_SECRET="${{ env.OIDC_RP_CLIENT_SECRET }}" \
+                    --from-literal=OIDC_OP_DISCOVERY_ENDPOINT="${{ env.OIDC_OP_DISCOVERY_ENDPOINT }}" \
+                    --from-literal=OIDC_OP_AUTHORIZATION_ENDPOINT="${{ env.OIDC_OP_AUTHORIZATION_ENDPOINT }}" \
+                    --from-literal=OIDC_OP_TOKEN_ENDPOINT="${{ env.OIDC_OP_TOKEN_ENDPOINT }}" \
+                    --from-literal=OIDC_OP_USER_ENDPOINT="${{ env.OIDC_OP_USER_ENDPOINT }}" \
+                    --from-literal=OIDC_OP_JWKS_ENDPOINT="${{ env.OIDC_OP_JWKS_ENDPOINT }}" \
+
+            - name: Deploy to Kubernetes
+              run: |
+                  kubectl apply -f db-deployment.yml
+                  kubectl apply -f db-service.yml
+                  kubectl apply -f deployment.yml
+                  kubectl apply -f service.yml
+
+            - name: Wait for database pod
+              run: kubectl wait --for=condition=ready pod -l app=postgres --timeout=300s
+
+            - name: Wait for app pod
+              run: kubectl wait --for=condition=ready pod -l app=sil-store-api --timeout=300s
+
+            - name: Run migrations
+              run: |
+                  POD_NAME=$(kubectl get pods -l app=sil-store-api -o jsonpath='{.items[0].metadata.name}')
+                  kubectl exec -it $POD_NAME -- python manage.py migrate --noinput
+
+            - name: Test API endpoint
+              run: |
+                  curl --fail http://localhost:8010/api/orders/
