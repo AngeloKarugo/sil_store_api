@@ -219,3 +219,7 @@ __marimo__/
 .coverage
 .coverage.*
 htmlcov/
+
+# secrets files
+*secrets.yml
+*secrets.yaml

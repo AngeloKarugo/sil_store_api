@@ -1,0 +1,25 @@
+# deployment.yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: sil-store-api-deployment
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            app: sil-store-api
+    template:
+        metadata:
+            labels:
+                app: sil-store-api
+        spec:
+            containers:
+                - name: app-container
+                  image: sil_store_api:latest
+                  imagePullPolicy: IfNotPresent
+                  ports:
+                      - containerPort: 8010
+                  envFrom:
+                      - secretRef:
+                            name: app-secrets
+            restartPolicy: Always

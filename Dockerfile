@@ -19,7 +19,7 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # copy project
 COPY . /app
 
-ENV PORT 8010
+ENV PORT=8010
 EXPOSE ${PORT}
 
 CMD ["gunicorn", "api.wsgi:application", "--bind", "0.0.0.0:8010", "--workers", "3"]
