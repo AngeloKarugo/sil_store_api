@@ -100,6 +100,7 @@ jobs:
         needs: tests
         env:
             APP_KEY: ${{ secrets.APP_KEY }}
+            APP_DEBUG: ${{ secrets.APP_DEBUG }}
             DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
             DATABASE_USER: ${{ secrets.DATABASE_USER }}
             DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
