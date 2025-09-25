@@ -12,9 +12,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 from decouple import config
-import requests
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -25,7 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config("APP_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config("APP_DEBUG", default=True)
 
 ALLOWED_HOSTS = []
 
@@ -45,18 +43,17 @@ INSTALLED_APPS = [
     "mozilla_django_oidc",
 ]
 
-# add OIDC auth backend so mozilla-django-oidc can create/authenticate Django users
 AUTHENTICATION_BACKENDS = (
     "mozilla_django_oidc.auth.OIDCAuthenticationBackend",
     "django.contrib.auth.backends.ModelBackend",
 )
 
-# ensure redirect goes to the API root (include trailing slash)
 LOGIN_URL = "/oidc/authenticate/"
 LOGIN_REDIRECT_URL = "/api/"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -135,6 +132,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -170,10 +169,8 @@ OIDC_OP_JWKS_ENDPOINT = config("OIDC_OP_JWKS_ENDPOINT")
 OIDC_CREATE_USER = True
 OIDC_RP_SIGN_ALGO = "RS256"
 
-# DRF: keep Session auth so browsable API + OIDC session login work
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        # Bearer token (Keycloak JWT) first, then session so browsers still work
         "api.authentication.KeycloakJWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",

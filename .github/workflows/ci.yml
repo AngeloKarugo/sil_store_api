@@ -1,135 +1,198 @@
 name: CI
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
 
 jobs:
-  tests:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15
+    tests:
+        runs-on: ubuntu-latest
+        services:
+            postgres:
+                image: postgres:15
+                env:
+                    POSTGRES_DB: sil_store
+                    POSTGRES_USER: postgres
+                    POSTGRES_PASSWORD: root
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd "pg_isready -U postgres" --health-interval 10s --health-timeout 5s --health-retries 5
+
         env:
-          POSTGRES_DB: sil_store
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: root
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres" --health-interval 10s --health-timeout 5s --health-retries 5
+            PYTHONUNBUFFERED: 1
+            DATABASE_NAME: sil_store
+            DATABASE_USER: postgres
+            DATABASE_PASSWORD: root
+            DATABASE_HOST: 127.0.0.1
+            DATABASE_PORT: 5432
+            APP_KEY: app-key
+            APP_DEBUG: True
+            AFRICASTALKING_USERNAME: ""
+            AFRICASTALKING_KEY: ""
+            EMAIL_HOST: ""
+            EMAIL_PORT: ""
+            EMAIL_USE_TLS: ""
+            EMAIL_HOST_USER: ""
+            EMAIL_HOST_PASSWORD: ""
+            EMAIL_USE_SSL: ""
+            DEFAULT_FROM_EMAIL: ""
+            ADMIN_EMAIL: ""
+            OIDC_RP_CLIENT_ID: ""
+            OIDC_RP_CLIENT_SECRET: ""
+            OIDC_OP_DISCOVERY_ENDPOINT: ""
+            OIDC_OP_AUTHORIZATION_ENDPOINT: ""
+            OIDC_OP_TOKEN_ENDPOINT: ""
+            OIDC_OP_USER_ENDPOINT: ""
+            OIDC_OP_JWKS_ENDPOINT: ""
 
-    env:
-      PYTHONUNBUFFERED: 1
-      DATABASE_NAME: sil_store
-      DATABASE_USER: postgres
-      DATABASE_PASSWORD: root
-      DATABASE_HOST: 127.0.0.1
-      DATABASE_PORT: 5432
-      # Disable OIDC discovery in CI to avoid network calls
-      OIDC_OP_DISCOVERY_ENDPOINT: ""
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+            - name: Setup Python
+              uses: actions/setup-python@v4
+              with:
+                  python-version: "3.12"
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.12'
+            - name: Cache pip
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/pip
+                  key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+                  restore-keys: |
+                      ${{ runner.os }}-pip-
 
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+            - name: Install dependencies
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install -r requirements.txt
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+            - name: Wait for Postgres
+              run: |
+                  for i in {1..20}; do
+                    if pg_isready -h 127.0.0.1 -p 5432 -U postgres; then
+                      echo "Postgres is ready"
+                      break
+                    fi
+                    echo "Waiting for Postgres..."
+                    sleep 1
+                  done
 
-      - name: Wait for Postgres
-        run: |
-          python - <<'PY'
-import time
-import psycopg
-for i in range(20):
-    try:
-        conn = psycopg.connect(host='127.0.0.1', port=5432, dbname='sil_store', user='postgres', password='root')
-        conn.close()
-        print('postgres ready')
-        break
-    except Exception as e:
-        print('waiting for postgres...', e)
-        time.sleep(1)
-else:
-    raise SystemExit('Postgres not ready')
-PY
+            - name: Run migrations
+              run: python manage.py migrate --noinput
 
-      - name: Run migrations
-        run: |
-          python manage.py migrate --noinput
+            - name: Run tests with coverage
+              run: |
+                  coverage run manage.py test
+                  coverage report
+                  coverage xml
 
-      - name: Run tests
-        run: |
-          python manage.py test
+            - name: Upload coverage to GitHub summary
+              run: |
+                  echo "## Test Coverage" >> $GITHUB_STEP_SUMMARY
+                  coverage report >> $GITHUB_STEP_SUMMARY
 
-  build-and-publish:
-    runs-on: ubuntu-latest
-    needs: tests
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Log in to DockerHub
-        if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_PASSWORD != '' }}
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-
-      - name: Build and push image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          push: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_PASSWORD != '' }}
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/sil_store_api:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/sil_store_api:${{ github.sha }}
-
-      - name: Upload image metadata
-        if: ${{ secrets.DOCKERHUB_USERNAME == '' }}
-        run: echo "Docker credentials not provided; skipped push"
-        
-`  deploy:
-    runs-on: ubuntu-latest
-    needs: build-and-publish
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up kubectl
-        run: |
-          echo "${KUBE_CONFIG_DATA}" | base64 --decode > $HOME/.kube/config
+    deploy:
+        runs-on: ubuntu-latest
+        needs: tests
         env:
-          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
+            APP_KEY: ${{ secrets.APP_KEY }}
+            APP_DEBUG: ${{ secrets.APP_DEBUG }}
+            DATABASE_NAME: ${{ secrets.DATABASE_NAME }}
+            DATABASE_USER: ${{ secrets.DATABASE_USER }}
+            DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+            DATABASE_HOST: ${{ secrets.DATABASE_HOST }}
+            DATABASE_PORT: ${{ secrets.DATABASE_PORT }}
+            AFRICASTALKING_USERNAME: ${{ secrets.AFRICASTALKING_USERNAME }}
+            AFRICASTALKING_KEY: ${{ secrets.AFRICASTALKING_KEY }}
+            EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
+            EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
+            EMAIL_USE_TLS: ${{ secrets.EMAIL_USE_TLS }}
+            EMAIL_HOST_USER: ${{ secrets.EMAIL_HOST_USER }}
+            EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
+            EMAIL_USE_SSL: ${{ secrets.EMAIL_USE_SSL }}
+            DEFAULT_FROM_EMAIL: ${{ secrets.DEFAULT_FROM_EMAIL }}
+            ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+            OIDC_RP_CLIENT_ID: ${{ secrets.OIDC_RP_CLIENT_ID }}
+            OIDC_RP_CLIENT_SECRET: ${{ secrets.OIDC_RP_CLIENT_SECRET }}
+            OIDC_OP_DISCOVERY_ENDPOINT: ${{ secrets.OIDC_OP_DISCOVERY_ENDPOINT }}
+            OIDC_OP_AUTHORIZATION_ENDPOINT: ${{ secrets.OIDC_OP_AUTHORIZATION_ENDPOINT }}
+            OIDC_OP_TOKEN_ENDPOINT: ${{ secrets.OIDC_OP_TOKEN_ENDPOINT }}
+            OIDC_OP_USER_ENDPOINT: ${{ secrets.OIDC_OP_USER_ENDPOINT }}
+            OIDC_OP_JWKS_ENDPOINT: ${{ secrets.OIDC_OP_JWKS_ENDPOINT }}
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Set up Helm
-        uses: azure/setup-helm@v3
-        with:
-          version: v3.14.0
+            - name: Install Kind and kubectl
+              run: |
+                  # Install kubectl
+                  curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                  chmod +x ./kubectl
+                  sudo mv ./kubectl /usr/local/bin/kubectl
 
-      - name: Helm upgrade
-        run: |
-          helm upgrade --install sil-store ./helm/sil-store \
-            --namespace sil-store --create-namespace \
-            --set image.repository=${{ secrets.DOCKERHUB_USERNAME }}/sil_store_api \
-            --set image.tag=${{ github.sha }}
+                  # Install Kind
+                  [ $(uname -m) = x86_64 ] && curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+                  chmod +x ./kind
+                  sudo mv ./kind /usr/local/bin/kind
+
+            - name: Create Kind cluster
+              run: kind create cluster --config kind-config.yml
+
+            - name: Build and Load Docker image
+              run: |
+                  docker build -t sil_store_api:latest .
+                  kind load docker-image sil_store_api:latest
+
+            - name: Create app secrets
+              run: |
+                  kubectl create secret generic app-secrets \
+                    --from-literal=APP_KEY="${{ env.APP_KEY }}" \
+                    --from-literal=APP_DEBUG="${{ env.APP_DEBUG }}" \
+                    --from-literal=DATABASE_NAME="${{ env.DATABASE_NAME }}" \
+                    --from-literal=DATABASE_USER="${{ env.DATABASE_USER }}" \
+                    --from-literal=DATABASE_PASSWORD="${{ env.DATABASE_PASSWORD }}" \
+                    --from-literal=DATABASE_HOST="${{ env.DATABASE_HOST }}" \
+                    --from-literal=DATABASE_PORT="${{ env.DATABASE_PORT }}" \
+                    --from-literal=AFRICASTALKING_USERNAME="${{ env.AFRICASTALKING_USERNAME }}" \
+                    --from-literal=AFRICASTALKING_KEY="${{ env.AFRICASTALKING_KEY }}" \
+                    --from-literal=EMAIL_HOST="${{ env.EMAIL_HOST }}" \
+                    --from-literal=EMAIL_PORT="${{ env.EMAIL_PORT }}" \
+                    --from-literal=EMAIL_USE_TLS="${{ env.EMAIL_USE_TLS }}" \
+                    --from-literal=EMAIL_HOST_USER="${{ env.EMAIL_HOST_USER }}" \
+                    --from-literal=EMAIL_HOST_PASSWORD="${{ env.EMAIL_HOST_PASSWORD }}" \
+                    --from-literal=EMAIL_USE_SSL="${{ env.EMAIL_USE_SSL }}" \
+                    --from-literal=DEFAULT_FROM_EMAIL="${{ env.DEFAULT_FROM_EMAIL }}" \
+                    --from-literal=ADMIN_EMAIL="${{ env.ADMIN_EMAIL }}" \
+                    --from-literal=OIDC_RP_CLIENT_ID="${{ env.OIDC_RP_CLIENT_ID }}" \
+                    --from-literal=OIDC_RP_CLIENT_SECRET="${{ env.OIDC_RP_CLIENT_SECRET }}" \
+                    --from-literal=OIDC_OP_DISCOVERY_ENDPOINT="${{ env.OIDC_OP_DISCOVERY_ENDPOINT }}" \
+                    --from-literal=OIDC_OP_AUTHORIZATION_ENDPOINT="${{ env.OIDC_OP_AUTHORIZATION_ENDPOINT }}" \
+                    --from-literal=OIDC_OP_TOKEN_ENDPOINT="${{ env.OIDC_OP_TOKEN_ENDPOINT }}" \
+                    --from-literal=OIDC_OP_USER_ENDPOINT="${{ env.OIDC_OP_USER_ENDPOINT }}" \
+                    --from-literal=OIDC_OP_JWKS_ENDPOINT="${{ env.OIDC_OP_JWKS_ENDPOINT }}" \
+
+            - name: Deploy to Kubernetes
+              run: |
+                  kubectl apply -f db-deployment.yml
+                  kubectl apply -f db-service.yml
+                  kubectl apply -f deployment.yml
+                  kubectl apply -f service.yml
+
+            - name: Wait for database pod
+              run: kubectl wait --for=condition=ready pod -l app=postgres --timeout=300s
+
+            - name: Wait for app pod
+              run: kubectl wait --for=condition=ready pod -l app=sil-store-api --timeout=300s
+
+            - name: Run migrations
+              run: |
+                  POD_NAME=$(kubectl get pods -l app=sil-store-api -o jsonpath='{.items[0].metadata.name}')
+                  kubectl exec -it $POD_NAME -- python manage.py migrate --noinput
+
+            - name: Test API endpoint
+              run: |
+                  curl --fail http://localhost:8010/health

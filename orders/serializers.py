@@ -24,7 +24,7 @@ class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True)
     # set customer from request.user in the view by using HiddenField
     customer = serializers.HiddenField(default=serializers.CurrentUserDefault())
-    # optional write-only phone number to attach/update Customer.profile
+
     customer_phone_number = serializers.CharField(
         write_only=True, required=False, allow_blank=True
     )
@@ -48,7 +48,6 @@ class OrderSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         items_data = validated_data.pop("items", [])
 
-        # accept phone number from payload (write-only) to populate Customer
         phone = validated_data.pop("customer_phone_number", None)
 
         # set default status (pending)
@@ -58,8 +57,8 @@ class OrderSerializer(serializers.ModelSerializer):
 
         customer = None
 
+        # Create Customer profile from user
         if user is not None:
-            # find or create the Customer profile
             customer, _ = Customer.objects.get_or_create(user=user)
 
         # if a phone number was supplied, update the customer profile

@@ -9,9 +9,11 @@ Django==5.2.6
 django-js-asset==3.1.2
 django-mptt==0.18.0
 djangorestframework==3.16.1
+gunicorn==21.2.0
 idna==3.10
 josepy==2.1.0
 mozilla-django-oidc==4.0.1
+packaging==25.0
 psycopg==3.2.10
 psycopg-binary==3.2.10
 pycparser==2.23
@@ -25,4 +27,4 @@ sqlparse==0.5.3
 typing_extensions==4.15.0
 tzdata==2025.2
 urllib3==2.5.0
-gunicorn==21.2.0
+whitenoise==6.11.0
