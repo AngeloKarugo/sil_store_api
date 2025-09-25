@@ -109,5 +109,4 @@ coverage run manage.py test && coverage report
 The project has a [GitHub Actions](https://github.com/features/actions) CI/CD workflow that:
 
 -   runs tests
--   builds the docker image and pushes it to DockerHub
 -   deploys the app to a Kind cluster
