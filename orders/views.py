@@ -11,7 +11,6 @@ class OrderViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
-        # ensure serializer has request context and will use CurrentUserDefault
         order = serializer.save()
 
         notifications.send_order_email(order)

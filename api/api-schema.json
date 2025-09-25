@@ -1,0 +1,464 @@
+{
+	"openapi": "3.0.3",
+	"info": {
+		"title": "SIL Store API Schema",
+		"version": "1.0.0",
+		"description": "API Schema for simple grocery store."
+	},
+	"servers": [
+		{
+			"url": "{{ HOST_NAME }}/api",
+			"description": "Server url (prefix /api)"
+		}
+	],
+	"components": {
+		"securitySchemes": {
+			"bearerAuth": {
+				"type": "http",
+				"scheme": "bearer"
+			}
+		},
+		"schemas": {
+			"Category": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer",
+						"readOnly": true
+					},
+					"name": {
+						"type": "string",
+						"maxLength": 100
+					},
+					"parent": {
+						"type": "integer",
+						"nullable": true,
+						"description": "Primary key of parent category or null"
+					},
+					"created_at": {
+						"type": "string",
+						"format": "date-time",
+						"readOnly": true
+					}
+				},
+				"required": ["name"]
+			},
+			"Product": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer",
+						"readOnly": true
+					},
+					"name": {
+						"type": "string"
+					},
+					"category": {
+						"type": "array",
+						"items": {
+							"type": "integer"
+						},
+						"description": "Array of category primary keys"
+					},
+					"price": {
+						"type": "number",
+						"format": "decimal"
+					},
+					"available": {
+						"type": "boolean"
+					},
+					"created_at": {
+						"type": "string",
+						"format": "date-time",
+						"readOnly": true
+					}
+				},
+				"required": ["name", "category", "price"]
+			},
+			"OrderItem": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer",
+						"readOnly": true
+					},
+					"product": {
+						"type": "integer",
+						"description": "Product primary key"
+					},
+					"quantity": {
+						"type": "integer",
+						"minimum": 1,
+						"default": 1
+					},
+					"unit_price": {
+						"type": "number",
+						"format": "decimal",
+						"readOnly": true
+					},
+					"created_at": {
+						"type": "string",
+						"format": "date-time",
+						"readOnly": true
+					}
+				},
+				"required": ["product"]
+			},
+			"OrderCreateItem": {
+				"type": "object",
+				"properties": {
+					"product": {
+						"type": "integer"
+					},
+					"quantity": {
+						"type": "integer",
+						"minimum": 1
+					}
+				},
+				"required": ["product"]
+			},
+			"Order": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer",
+						"readOnly": true
+					},
+					"customer": {
+						"type": "integer",
+						"readOnly": true,
+						"description": "Customer primary key (set from authenticated user)"
+					},
+					"items": {
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/OrderItem"
+						}
+					},
+					"created_at": {
+						"type": "string",
+						"format": "date-time",
+						"readOnly": true
+					},
+					"customer_phone_number": {
+						"type": "string",
+						"writeOnly": true
+					}
+				}
+			},
+			"OrderCreate": {
+				"type": "object",
+				"properties": {
+					"items": {
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/OrderCreateItem"
+						}
+					},
+					"customer_phone_number": {
+						"type": "string"
+					}
+				},
+				"required": ["items"]
+			},
+			"Customer": {
+				"type": "object",
+				"properties": {
+					"id": {
+						"type": "integer",
+						"readOnly": true
+					},
+					"user": {
+						"type": "integer",
+						"description": "User primary key"
+					},
+					"phone_number": {
+						"type": "string"
+					}
+				}
+			},
+			"AveragePriceResponse": {
+				"type": "object",
+				"properties": {
+					"average_price": {
+						"type": "number",
+						"nullable": true,
+						"format": "decimal"
+					}
+				}
+			}
+		}
+	},
+	"paths": {
+		"/categories/": {
+			"get": {
+				"summary": "List categories",
+				"security": [
+					{
+						"bearerAuth": []
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "A list of categories",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"$ref": "#/components/schemas/Category"
+									}
+								}
+							}
+						}
+					}
+				}
+			},
+			"post": {
+				"summary": "Create a category (admin only)",
+				"security": [
+					{
+						"bearerAuth": []
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/Category"
+							}
+						}
+					}
+				},
+				"responses": {
+					"201": {
+						"description": "Category created",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Category"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/categories/{id}/": {
+			"parameters": [
+				{
+					"name": "id",
+					"in": "path",
+					"required": true,
+					"schema": {
+						"type": "integer"
+					}
+				}
+			],
+			"get": {
+				"summary": "Retrieve a category",
+				"security": [
+					{
+						"bearerAuth": []
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Category",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Category"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/categories/{id}/average_price/": {
+			"parameters": [
+				{
+					"name": "id",
+					"in": "path",
+					"required": true,
+					"schema": {
+						"type": "integer"
+					}
+				}
+			],
+			"get": {
+				"summary": "Get average price for a category and its descendants",
+				"security": [
+					{
+						"bearerAuth": []
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Average price",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AveragePriceResponse"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/products/": {
+			"get": {
+				"summary": "List products",
+				"security": [
+					{
+						"bearerAuth": []
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "A list of products",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "array",
+									"items": {
+										"$ref": "#/components/schemas/Product"
+									}
+								}
+							}
+						}
+					}
+				}
+			},
+			"post": {
+				"summary": "Create a product (admin only)",
+				"security": [
+					{
+						"bearerAuth": []
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/Product"
+							}
+						}
+					}
+				},
+				"responses": {
+					"201": {
+						"description": "Product created",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Product"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/products/{id}/": {
+			"parameters": [
+				{
+					"name": "id",
+					"in": "path",
+					"required": true,
+					"schema": {
+						"type": "integer"
+					}
+				}
+			],
+			"get": {
+				"summary": "Retrieve a product",
+				"security": [
+					{
+						"bearerAuth": []
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Product",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Product"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/orders/": {
+			"post": {
+				"summary": "Create an order (authenticated users). Sends a confirmation email to the admin email and a confirmation SMS to the customer.",
+				"security": [
+					{
+						"bearerAuth": []
+					}
+				],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/OrderCreate"
+							}
+						}
+					}
+				},
+				"responses": {
+					"201": {
+						"description": "Order created",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Order"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/orders/{id}/": {
+			"parameters": [
+				{
+					"name": "id",
+					"in": "path",
+					"required": true,
+					"schema": {
+						"type": "integer"
+					}
+				}
+			],
+			"get": {
+				"summary": "Retrieve an order",
+				"security": [
+					{
+						"bearerAuth": []
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Order",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Order"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

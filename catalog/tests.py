@@ -45,7 +45,7 @@ class CategoryTests(TestCase):
         self.carrots.category.add(self.vegetables)
 
     def test_category_hierarchy(self):
-        """Test that MPTT correctly handles the category hierarchy"""
+        """Test MPTT correctly handles the category hierarchy"""
         self.assertEqual(
             self.all_products.get_descendants().count(), 4
         )  # bakery, produce, fruits, vegetables
@@ -58,18 +58,14 @@ class CategoryTests(TestCase):
 
     def test_average_price_calculation(self):
         """Test average price calculations at different levels of the hierarchy"""
-        # Bakery: (2.50 + 1.50) / 2 = 2.00
         self.assertEqual(self.bakery.get_average_price(), Decimal("2.00"))
 
-        # Fruits: (0.50 + 0.30) / 2 = 0.40
         self.assertEqual(self.fruits.get_average_price(), Decimal("0.40"))
 
-        # Produce: (0.50 + 0.30 + 0.75) / 3 = 0.52 (rounded to 2 decimals)
         self.assertAlmostEqual(
             self.produce.get_average_price(), Decimal("0.52"), places=2
         )
 
-        # All Products: (2.50 + 1.50 + 0.50 + 0.30 + 0.75) / 5 = 1.11
         self.assertAlmostEqual(
             self.all_products.get_average_price(), Decimal("1.11"), places=2
         )

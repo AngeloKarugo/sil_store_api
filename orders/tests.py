@@ -31,7 +31,7 @@ class OrderSerializerTests(TestCase):
             name="Test Product 2", price=Decimal("20.00")
         )
         self.product2.category.add(self.category)
-        # Get pending status
+
         self.pending_status, _ = OrderStatus.objects.get_or_create(name="pending")
 
     def test_order_creation_with_authenticated_user(self):
@@ -49,10 +49,8 @@ class OrderSerializerTests(TestCase):
             "status": self.pending_status.id,
         }
 
-        # Create serializer with request context
         serializer = OrderSerializer(data=order_data, context={"request": request})
 
-        # Validate and save
         self.assertTrue(serializer.is_valid(), serializer.errors)
         order = serializer.save()
 
