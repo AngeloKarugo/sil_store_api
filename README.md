@@ -88,7 +88,7 @@ For token-based auth (to use the API in http clients such as Postman) obtain an 
 
 ## **API Endpoints**
 
-The endpoints available for performing different actions in the app are documented in `/api/api-schema.json`. You can use the OpenAPI JSON schema to generate a Postman collection.
+The endpoints available for performing different actions in the app are documented in [the JSON schema](https://github.com/AngeloKarugo/sil_store_api/blob/main/api/api-schema.json). You can use the OpenAPI JSON schema to generate a Postman collection.
 
 ## **Testing**
 
